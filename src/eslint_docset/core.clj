@@ -1,0 +1,81 @@
+(ns eslint-docset.core
+  (:require [clojure.java.jdbc :as j]
+            [clojure.java.shell :refer [sh]]
+            [clojure.java.io :refer [file resource]])
+  (:import [org.jsoup Jsoup]
+           [org.apache.commons.io FileUtils])
+  (:gen-class))
+
+(def user-dir (System/getProperty "user.dir"))
+(def conf (read-string (slurp (resource "config.clj"))))
+
+(defn file-ref [file-name]
+  (file user-dir file-name))
+
+(defn resource-copy [src dest]
+  (FileUtils/copyURLToFile (resource src) (file-ref dest)))
+
+(def sqlite-db {:classname "org.sqlite.JDBC"
+                :subprotocol "sqlite"
+                :subname (:db-file-path conf)})
+
+(defn print-progress [percent text]
+  (let [x (int (/ percent 2))
+        y (- 50 x)]
+    (print "\r" (apply str (repeat 100 " ")))               ;clear existing text
+    (print "\r" "["
+           (apply str (concat (repeat x "=") [">"] (repeat y " ")))
+           (str "] " percent "%") text)
+    (when (= 100 percent) (println))
+    (flush)))
+
+(defn mirror-elintdocs []
+  (print-progress 15 "Mirroring http://eslint.org/docs/rules/")
+  (if-not (.exists (file-ref (:httrack-eslintdocs conf)))
+    (apply sh (:httrack conf))))
+
+(defn create-docset-template []
+  (print-progress 40 "Creating docset template")
+  (.mkdirs (file-ref (:docset-template conf)))
+  (resource-copy "icon.png" "eslint-docs.docset/icon.png")
+  (resource-copy "Info.plist" "eslint-docs.docset/Contents/Info.plist"))
+
+(defn copy-html-to-docset []
+  (print-progress 50 "Copying clojuredocs.org to docset")
+  (FileUtils/copyDirectoryToDirectory (file-ref (:httrack-eslintdocs conf)) (file-ref (:docset-template conf))))
+
+(defn clear-search-index []
+  (print-progress 60 "Clearing index")
+  (j/db-do-commands sqlite-db "DROP TABLE IF EXISTS searchIndex"
+                               "CREATE TABLE searchIndex(id INTEGER PRIMARY KEY, name TEXT, type TEXT, path TEXT)"
+                               "CREATE UNIQUE INDEX anchor ON searchIndex (name, type, path)"))
+
+(defn populate-search-index [rows]
+  (apply j/insert! sqlite-db :searchIndex rows))
+
+(defn search-index-attributes [element]
+  {:name (.text element)
+   :type "Instruction"
+   :path (str "eslint.org/docs/rules/" (.attr element "href"))})
+
+(defn generate-search-index []
+  (print-progress 75 "Generating index")
+  (let [html-content (slurp (str user-dir "/" (:index-html-path conf)))
+        document (Jsoup/parse html-content)
+        rows (map search-index-attributes (.select document "article li > a"))]
+    (populate-search-index rows)))
+
+(defn generate-docset []
+  (mirror-elintdocs)
+  (create-docset-template)
+  (copy-html-to-docset)
+  (clear-search-index)
+  (generate-search-index)
+  (print-progress 100 "Done."))
+
+(defn -main
+  [& args]
+  ;; work around dangerous default behaviour in Clojure
+  (alter-var-root #'*read-eval* (constantly false))
+  (generate-docset)
+  (shutdown-agents))

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>ESlint</string>
+  <key>CFBundleName</key>
+  <string>ESlint</string>
+  <key>DocSetPlatformFamily</key>
+  <string>eslint</string>
+  <key>isDashDocset</key>
+  <true/>
+  <key>dashIndexFilePath</key>
+  <string>eslint.org/docs/rules/index.html</string>
+  <key>isJavaScriptEnabled</key><true/>
+</dict>
+</plist>
