@@ -24,7 +24,7 @@ Install the following dependencies:
 
 
 ## Usage
-Download [uberjar](releases) and run:
+Download [uberjar](https://github.com/miguelbermudez/eslint-docset/releases) and run:
 
 	$ java -jar eslint-docset-<version>-standalone.jar
 	
